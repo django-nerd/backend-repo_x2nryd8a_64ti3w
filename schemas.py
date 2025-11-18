@@ -1,48 +1,60 @@
 """
-Database Schemas
+Database Schemas for the Electronic Hardware Dealer app
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model represents a collection in MongoDB.
+Collection name is the lowercase of the class name.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+- User -> "user"
+- Category -> "category"
+- Product -> "product"
+- Order -> "order"
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
 
-# Example schemas (replace with your own):
-
+# Users
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
     name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
+    email: EmailStr = Field(..., description="Email address")
+    hashed_password: str = Field(..., description="Password hash")
+    role: str = Field("customer", description="Role: customer or admin")
     is_active: bool = Field(True, description="Whether user is active")
 
+# Categories (supports hierarchy via parent_id)
+class Category(BaseModel):
+    name: str = Field(..., description="Category name")
+    parent_id: Optional[str] = Field(None, description="Parent category _id (for subcategories)")
+    description: Optional[str] = Field(None, description="Optional description")
+
+# Products
 class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
+    name: str = Field(..., description="Product name")
     description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+    price: float = Field(..., ge=0, description="Unit price")
+    sku: Optional[str] = Field(None, description="Stock keeping unit")
+    image_url: Optional[str] = Field(None, description="Image URL")
+    category_id: str = Field(..., description="Category _id")
+    subcategory_id: Optional[str] = Field(None, description="Subcategory _id")
+    in_stock: bool = Field(True, description="In stock flag")
+    stock_qty: Optional[int] = Field(None, ge=0, description="Optional stock quantity")
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Orders
+class OrderItem(BaseModel):
+    product_id: str = Field(..., description="Product _id")
+    name: str = Field(..., description="Snapshot of product name at order time")
+    quantity: int = Field(..., ge=1, description="Quantity ordered")
+    unit_price: float = Field(..., ge=0, description="Unit price at order time")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Order(BaseModel):
+    user_id: str = Field(..., description="User _id placing the order")
+    email: EmailStr = Field(..., description="Customer email for confirmations")
+    items: List[OrderItem] = Field(..., description="Line items")
+    subtotal: float = Field(..., ge=0)
+    tax: float = Field(0, ge=0)
+    total: float = Field(..., ge=0)
+    status: str = Field("placed", description="Order status")
+    notes: Optional[str] = Field(None, description="Optional notes from customer")
+    shipping_name: Optional[str] = Field(None, description="Recipient name")
+    shipping_address: Optional[str] = Field(None, description="Shipping address")
+    shipping_phone: Optional[str] = Field(None, description="Phone number")
